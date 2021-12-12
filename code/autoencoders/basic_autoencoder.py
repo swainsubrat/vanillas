@@ -3,7 +3,6 @@ Pytorch implementation of the Autoencoder
 """
 import sys
 import torch
-from torch.utils.data import dataloader
 
 sys.path.append("../")
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -12,14 +11,14 @@ import matplotlib.pyplot as plt
 from torch import nn
 from dataloader import load_mnist
 	
-def save_checkpoint(epoch, encoder, decoder, encoder_optimizer, decoder_optimizer):
+def save_checkpoint(epoch, encoder, decoder, encoder_optimizer, decoder_optimizer, path='../models/checkpoint_enc_dec.pth.tar'):
     state = {'epoch': epoch,
              'encoder': encoder,
              'decoder': decoder,
              'encoder_optimizer': encoder_optimizer,
              'decoder_optimizer': decoder_optimizer}
 
-    filename = '../models/checkpoint_enc_dec.pth.tar'
+    filename = path
     torch.save(state, filename)
 
 
@@ -70,12 +69,15 @@ class Decoder(nn.Module):
 
 if __name__ == "__main__":
 
+    print(f"Using {device} as the accelerator")
     try:
         # try loading checkpoint
         checkpoint = torch.load('../models/checkpoint_enc_dec.pth.tar')
         print("Found Checkpoint :)")
         encoder = checkpoint["encoder"]
         decoder = checkpoint["decoder"]
+        encoder.to(device)
+        decoder.to(device)
 
     except:
         # train the model from scratch
@@ -83,7 +85,9 @@ if __name__ == "__main__":
 
         encoder = Encoder()
         decoder = Decoder()
-        criterion = nn.MSELoss()
+        encoder.to(device)
+        decoder.to(device)
+        criterion = nn.MSELoss().to(device)
         encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=1e-3, weight_decay=1e-5)
         decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-5)
         
@@ -91,6 +95,7 @@ if __name__ == "__main__":
 
         for epoch in range(10):
             for i, (image, _) in enumerate(train_dataloader):
+                image.to(device)
                 encoded_image = encoder(image)
                 decoded_image = decoder(encoded_image)
                 
@@ -104,15 +109,15 @@ if __name__ == "__main__":
 
                 if i % 100 == 0 and i != 0:
                     print(f"Epoch: [{epoch+1}][{i}/{len(train_dataloader)}] Loss: {loss.item(): .4f}")
-                
 
             save_checkpoint(epoch, encoder, decoder, encoder_optimizer, decoder_optimizer)
     
     # do reconstruction
-    train_dataloader, _ = load_mnist(batch_size=1)
+    _, test_dataloader = load_mnist(batch_size=1)
     decoded_image    = None
 
-    for i, (image, _) in enumerate(train_dataloader):
+    for i, (image, _) in enumerate(test_dataloader):
+        image.to(device)
         encoded_image = encoder(image)
         decoded_image = decoder(encoded_image)
         break
